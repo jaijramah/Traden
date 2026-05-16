@@ -1,0 +1,1 @@
+export function createReviewRequest(input:{reviewLink?:string;customerName?:string}) { const link = input.reviewLink ?? 'https://g.page/r/demo'; return { reviewLink:link, messageText:`Thanks again for booking with us today. If you’re happy with the work, it would really help us if you could leave a quick Google review here: ${link}`, status:'draft' as const }; }

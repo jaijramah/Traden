@@ -1,0 +1,2 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'; import { join } from 'node:path';
+const bad=[]; function walk(d){for(const f of readdirSync(d)){if(['node_modules','.next','.git'].includes(f))continue; const p=join(d,f); if(statSync(p).isDirectory())walk(p); else if(/\.(ts|tsx|js|mjs)$/.test(p)){const s=readFileSync(p,'utf8'); if(/try\s*{\s*[^}]*import\s/.test(s))bad.push(p);}}} walk('.'); if(bad.length){console.error('Invalid import try/catch:',bad);process.exit(1)} console.log('lint ok');

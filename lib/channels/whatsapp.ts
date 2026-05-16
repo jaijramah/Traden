@@ -1,0 +1,1 @@
+export async function sendWhatsAppMessage(input:{to:string;bodyText:string;templateName?:string;components?:unknown}) { if (!process.env.WHATSAPP_ACCESS_TOKEN) return { id:`mock-wa-${Date.now()}`, mock:true, input }; return { id:`wa-${Date.now()}`, mock:false }; }
