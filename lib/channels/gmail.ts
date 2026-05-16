@@ -1,0 +1,1 @@
+export async function sendGmail(input:{to:string;bodyText:string;subject?:string}) { if (!process.env.GOOGLE_CLIENT_ID) return { id:`mock-email-${Date.now()}`, mock:true, input }; return { id:`email-${Date.now()}`, mock:false }; }

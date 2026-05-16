@@ -1,0 +1,1 @@
+export function parseLooseDate(input: string, now = new Date()) { const text = input.toLowerCase(); const d = new Date(now); if (text.includes('tomorrow')) d.setDate(d.getDate()+1); if (text.includes('next week')) d.setDate(d.getDate()+7); return d; }
