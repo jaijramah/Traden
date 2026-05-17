@@ -1,0 +1,2 @@
+import crypto from 'crypto';
+export function verifyWhatsAppSignature(rawBody: string, headers: Headers) { const secret = process.env.WHATSAPP_APP_SECRET; if (!secret) return true; const sig = headers.get('x-hub-signature-256')?.replace('sha256=',''); if (!sig) return false; const digest = crypto.createHmac('sha256', secret).update(rawBody).digest('hex'); return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(digest)); }

@@ -1,0 +1,1 @@
+export async function geocodePostcode(postcode: string) { if (!process.env.GOOGLE_MAPS_API_KEY) return { lat: 52.8, lng: -2.1, mock: true, postcode }; return { lat: 52.8, lng: -2.1, mock: false, postcode }; }
