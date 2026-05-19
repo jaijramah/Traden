@@ -2,6 +2,7 @@ import http from 'node:http';
 
 const port = process.env.PORT || 3000;
 
+const trades = ['electrician', 'gas engineer', 'roofer', 'mobile detailer', 'cleaner', 'plumber', 'window tinter'];
 const demoMessages = [
   'Hi, need an EICR for a 3 bed house in Stafford next week. How much?',
   'Hi mate, how much for a Worcester boiler service? I’m in Cannock and can do Friday.',
@@ -12,172 +13,86 @@ const demoMessages = [
 ];
 
 const services = [
-  { name: 'Boiler service', keywords: ['boiler', 'worcester'], price: 85, risk: 'high', missing: ['boiler make/model', 'full postcode'] },
-  { name: 'EICR certificate', keywords: ['eicr', 'certificate'], price: 120, risk: 'high', missing: ['full postcode', 'property type'] },
-  { name: 'Leak inspection', keywords: ['leak', 'roof', 'ceiling'], fromPrice: 120, risk: 'high', missing: ['photos', 'access notes'] },
-  { name: 'Deep clean', keywords: ['deep clean', 'range rover', 'dirty'], price: 170, risk: 'low', missing: ['water/power access'] },
-  { name: 'End-of-tenancy clean', keywords: ['end of tenancy', '2 bed', 'flat'], price: 160, risk: 'low', missing: ['full postcode'] },
-  { name: 'Rear window tints', keywords: ['rear tints', 'golf', 'tint'], price: 150, risk: 'low', missing: ['shade preference'] }
+  { trade: 'electrician', name: 'EICR certificate', keywords: ['eicr', 'electric'], price: 120, risk: 'high', missing: ['full postcode', 'property type'] },
+  { trade: 'gas engineer', name: 'Boiler service', keywords: ['boiler', 'worcester', 'gas'], price: 85, risk: 'high', missing: ['boiler make/model', 'full postcode'] },
+  { trade: 'roofer', name: 'Leak inspection', keywords: ['leak', 'roof', 'ceiling'], fromPrice: 120, risk: 'high', missing: ['photos', 'access notes'] },
+  { trade: 'mobile detailer', name: 'Deep clean', keywords: ['deep clean', 'range rover', 'detail'], price: 170, risk: 'low', missing: ['vehicle size', 'water/power access'] },
+  { trade: 'cleaner', name: 'End-of-tenancy clean', keywords: ['tenancy', 'clean', 'flat'], price: 160, risk: 'low', missing: ['full postcode', 'rooms'] },
+  { trade: 'plumber', name: 'Leak visit', keywords: ['plumb', 'tap', 'radiator'], price: 90, risk: 'high', missing: ['full postcode', 'issue description'] },
+  { trade: 'window tinter', name: 'Rear window tints', keywords: ['tint', 'rear', 'golf'], price: 150, risk: 'low', missing: ['vehicle make/model', 'shade preference'] }
 ];
 
 function analyseLead(bodyText = '') {
   const text = bodyText.toLowerCase();
-  const service = services.find((item) => item.keywords.some((keyword) => text.includes(keyword))) ?? services[0];
-  const city = ['stafford', 'cannock', 'walsall', 'wolverhampton', 'birmingham'].find((place) => text.includes(place));
-  const classification = /refund|complaint|unhappy|angry/.test(text) ? 'complaint' : /seo|crypto|loan/.test(text) ? 'spam' : 'new_lead';
+  const service = services.find((s) => s.keywords.some((k) => text.includes(k))) ?? services[0];
+  const classification = /refund|complaint|angry/.test(text) ? 'complaint' : /seo|crypto|loan/.test(text) ? 'spam' : 'new_lead';
   const suggestedReply = service.fromPrice
     ? `Hi, yes we can help. ${service.name} starts from £${service.fromPrice}. Could you send ${service.missing.join(', ')} so we can quote it properly?`
     : `Hi, yes we can help. ${service.name} is £${service.price}. Could you send ${service.missing.join(', ')} please?`;
-
   return {
-    universalMessage: {
-      channel: 'manual',
-      senderHandle: 'demo-customer',
-      bodyText,
-      receivedAt: new Date().toISOString()
-    },
     analysis: {
       classification,
       confidence: classification === 'new_lead' ? 0.88 : 0.7,
+      trade: service.trade,
       serviceMatch: service.name,
-      location: city ?? 'not detected',
-      urgency: /urgent|leak|emergency/.test(text) ? 'high' : 'medium',
       missingFields: service.missing,
       riskLevel: service.risk,
       ownerApprovalRequired: service.risk === 'high' || classification !== 'new_lead'
     },
     pricing: {
-      canQuote: Boolean(service.price || service.fromPrice),
+      canQuote: true,
       price: service.price,
       fromPrice: service.fromPrice,
       currency: 'GBP',
-      explanation: 'Calculated from demo pricing rules. No AI invented prices.'
+      explanation: 'Calculated from saved demo pricing rules. No AI invented prices.'
     },
     suggestedReply,
-    nextAction: service.risk === 'high' ? 'Create owner approval card' : 'Ask missing details or send quote'
+    nextAction: service.risk === 'high' ? 'Create owner approval card' : 'Send quote or ask missing details'
   };
 }
 
-const css = String.raw`
-:root{--bg:#050607;--surface:#101316;--surface2:#171B20;--border:#2A3036;--text:#F7F7F2;--muted:#A8B0B8;--accent:#EFFF1A;--green:#C8FF1A;--success:#28E070;--warning:#F7C948;--danger:#FF5B5B}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 82% 0%,rgba(239,255,26,.20),transparent 28%),radial-gradient(circle at 15% 20%,rgba(200,255,26,.09),transparent 22%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}.shell{max-width:1180px;margin:0 auto;padding:24px}.topbar{position:sticky;top:0;z-index:10;background:rgba(5,6,7,.78);backdrop-filter:blur(18px);border-bottom:1px solid rgba(42,48,54,.65)}.nav{display:flex;align-items:center;justify-content:space-between;gap:18px}.logo{font-size:25px;font-weight:950;letter-spacing:-.06em}.logo span{color:var(--accent)}.navlinks{display:flex;gap:8px;flex-wrap:wrap}.navlinks a{color:var(--muted);font-weight:700;padding:10px 12px;border-radius:999px}.navlinks a:hover{background:rgba(239,255,26,.08);color:var(--text)}.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(340px,.95fr);gap:34px;align-items:center;padding:72px 0 52px}.eyebrow,.pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:rgba(23,27,32,.82);border-radius:999px;padding:7px 11px;color:var(--muted);font-size:13px;font-weight:800}.dot{width:8px;height:8px;background:var(--success);border-radius:99px;box-shadow:0 0 20px var(--success)}h1{font-size:clamp(48px,8vw,92px);line-height:.91;letter-spacing:-.075em;margin:18px 0 18px;max-width:920px}.lead{font-size:clamp(18px,2.2vw,23px);line-height:1.45;color:var(--muted);max-width:760px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--green));color:#050607;font-weight:950;padding:14px 20px;box-shadow:0 14px 42px rgba(239,255,26,.18);cursor:pointer}.btn.secondary{background:rgba(16,19,22,.8);color:var(--text);border:1px solid var(--border);box-shadow:none}.btn:hover{transform:translateY(-1px)}.panel{background:linear-gradient(180deg,rgba(23,27,32,.96),rgba(10,12,14,.96));border:1px solid var(--border);border-radius:30px;box-shadow:0 28px 80px rgba(0,0,0,.45),inset 0 1px rgba(255,255,255,.04);overflow:hidden}.phone{max-width:470px;margin-left:auto}.phone-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding:16px 18px}.status{color:var(--success);font-weight:900;font-size:12px}.message{margin:18px;background:#080a0c;border:1px solid var(--border);border-radius:22px;padding:17px}.bubble{background:rgba(239,255,26,.10);border:1px solid rgba(239,255,26,.22);padding:14px;border-radius:18px;color:#fff}.analysis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.metric{background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:16px;padding:12px}.metric b{display:block;color:var(--accent);font-size:20px}.reply{margin-top:14px;border-left:3px solid var(--accent);padding:12px 14px;background:rgba(239,255,26,.07);border-radius:12px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.card{background:linear-gradient(180deg,var(--surface),#0b0d0f);border:1px solid var(--border);border-radius:24px;padding:22px}.card h3{margin:8px 0 8px;font-size:21px;letter-spacing:-.02em}.muted{color:var(--muted);line-height:1.55}.strip{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0}.workflow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;counter-reset:step}.step{position:relative;padding-top:48px}.step:before{counter-increment:step;content:counter(step);position:absolute;top:18px;left:18px;width:28px;height:28px;border-radius:99px;background:var(--accent);color:#050607;display:grid;place-items:center;font-weight:950}.section{padding:34px 0}.section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px}.section-title h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.055em;margin:0}.lab{display:grid;grid-template-columns:.9fr 1.1fr;gap:18px;padding:34px 0}.textarea{width:100%;min-height:180px;background:#080a0c;color:var(--text);border:1px solid var(--border);border-radius:20px;padding:16px;font:inherit;resize:vertical}.examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.example{background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:8px 10px;cursor:pointer}.result{white-space:pre-wrap;overflow:auto;max-height:560px;background:#07090a;border:1px solid var(--border);border-radius:18px;padding:14px;color:#d9e1e8;font-size:13px}.footer-cta{text-align:center;padding:56px 24px;margin:40px 0}.footer-cta h2{font-size:clamp(34px,5vw,60px);letter-spacing:-.06em;margin:0 0 12px}@media(max-width:860px){.hero,.lab{grid-template-columns:1fr}.phone{margin:0;max-width:none}.grid,.workflow{grid-template-columns:1fr}.nav{align-items:flex-start}.navlinks{display:none}h1{font-size:52px}.shell{padding:18px}.analysis{grid-template-columns:1fr}}
+const css = `:root{--bg:#050607;--surface:#101316;--surface2:#171B20;--border:#2A3036;--text:#F7F7F2;--muted:#A8B0B8;--accent:#EFFF1A;--green:#C8FF1A}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}.shell{max-width:1180px;margin:0 auto;padding:20px}.top{position:sticky;top:0;background:#050607d9;border-bottom:1px solid var(--border)}.nav{display:flex;justify-content:space-between;align-items:center;gap:10px}.links{display:flex;gap:8px;flex-wrap:wrap}.links a{color:var(--muted);padding:8px 10px;border-radius:999px}.links a:hover{background:var(--surface2);color:var(--text)}.btn{border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--green));color:#050607;cursor:pointer}.btn.secondary{background:#171B20;color:var(--text);border:1px solid var(--border)}.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.hero{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}.muted{color:var(--muted)}.pill{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:5px 9px;color:var(--muted);font-size:12px}.input,.textarea,select{width:100%;background:#080a0c;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px}.textarea{min-height:120px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}.state{font-size:12px;color:var(--muted)}pre{white-space:pre-wrap;background:#07090a;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:420px;overflow:auto}@media(max-width:900px){.hero{grid-template-columns:1fr}.links{display:none}}`;
+
+const appJs = `
+const seedServices=${JSON.stringify(services.map(s=>({trade:s.trade,name:s.name,price:s.price??s.fromPrice??0})))};
+function getState(){return JSON.parse(localStorage.getItem('traden_state')||'{}')}
+function saveState(s){localStorage.setItem('traden_state',JSON.stringify(s))}
+function ensure(){const s=getState();if(!s.business)s.business={name:'Traden Demo Business',trade:'gas engineer',onboarded:false,automation:'assisted'};if(!s.services)s.services=seedServices;if(!s.leads)s.leads=[];if(!s.actions)s.actions=[];if(!s.jobs)s.jobs=[];if(!s.invoices)s.invoices=[];if(!s.reviews)s.reviews=[];saveState(s);return s}
+window.traden={getState,saveState,ensure};
 `;
 
-function layout(content, title = 'Traden') {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>${css}</style></head><body><div class="topbar"><div class="shell nav"><a class="logo" href="/">TRA<span>DEN</span></a><div class="navlinks"><a href="/test-lab">Test Lab</a><a href="/dashboard">Dashboard</a><a href="/leads">Leads</a><a href="/actions">Actions</a><a href="/settings/integrations">Integrations</a></div><a class="btn" href="/?demo=1#live-demo">Try demo</a></div></div>${content}</body></html>`;
+function shell(title, body, pageScript = '') {
+  return `<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>${title}</title><style>${css}</style></head><body><div class='top'><div class='shell nav'><a href='/'><b>TRA<span style='color:#EFFF1A'>DEN</span></b></a><div class='links'><a href='/onboarding'>Onboarding</a><a href='/dashboard'>Dashboard</a><a href='/test-lab'>Test Lab</a><a href='/leads'>CRM</a><a href='/actions'>Actions</a><a href='/calendar'>Calendar</a><a href='/jobs'>Jobs</a><a href='/invoices'>Invoices</a><a href='/settings'>Settings</a></div><a class='btn' href='/test-lab'>Try demo</a></div></div><main class='shell'>${body}</main><script>${appJs}</script><script>${pageScript}</script></body></html>`;
 }
 
-function landingPage({ preRun = false } = {}) {
-  const initialLandingResult = preRun
-    ? escapeHtml(JSON.stringify(analyseLead(demoMessages[1]), null, 2))
-    : 'Click “Run demo pipeline” to see Traden analyse a real trade enquiry.';
-  return layout(`<main class="shell">
-    <section class="hero">
-      <div>
-        <span class="eyebrow"><span class="dot"></span> Demo mode live • real integrations ready</span>
-        <h1>Turn trade enquiries into booked jobs.</h1>
-        <p class="lead">Traden replies to leads, creates quotes from your saved prices, books jobs, tracks your pipeline, sends invoices and gets reviews — so you can stay on the tools.</p>
-        <div class="actions"><a class="btn" href="#live-demo" data-demo-start>Try demo now →</a><a class="btn secondary" href="/test-lab">Open full Test Lab</a></div>
-      </div>
-      <aside class="panel phone" aria-label="Demo lead workflow preview">
-        <div class="phone-head"><b>New WhatsApp lead</b><span class="status">READY TO APPROVE</span></div>
-        <div class="message"><div class="bubble">Hi mate, how much for a Worcester boiler service? I’m in Cannock and can do Friday.</div><div class="analysis"><div class="metric"><small>Matched service</small><b>Boiler service</b></div><div class="metric"><small>Saved price</small><b>£85</b></div><div class="metric"><small>Risk gate</small><b>Owner</b></div><div class="metric"><small>Next step</small><b>Ask details</b></div></div><div class="reply"><b>Suggested reply</b><br>Hi, a standard boiler service is £85. Friday may work. What make/model is the boiler and what’s the full postcode please?</div></div>
-      </aside>
-    </section>
-    <section class="section"><div class="grid">${['AI lead replies','Quote from your own prices','WhatsApp/SMS/email inbox','Google Calendar booking','Follow-ups','Invoice/payment/review flow'].map((item) => `<article class="card"><span class="pill">Built for trades</span><h3>${item}</h3><p class="muted">Practical workflows, safety checks and owner approval before risky automation.</p></article>`).join('')}</div></section>
-    <section class="section panel" style="padding:24px"><div class="section-title"><h2>Trade-agnostic from day one.</h2><p class="muted">Not just tinting software. Built for mobile service businesses.</p></div><div class="strip">${['Electricians','Gas engineers','Roofers','Mobile detailers','Cleaners','Plumbers','Landscapers','Window tinters'].map((item) => `<span class="pill">${item}</span>`).join('')}</div></section>
-    <section id="live-demo" class="section panel live-demo" style="padding:24px">
-      <div class="section-title"><div><span class="eyebrow"><span class="dot"></span> Live demo</span><h2>Press once. Watch Traden work.</h2></div><p class="muted">No signup. No API keys. This runs the same deterministic demo pipeline used by the Test Lab.</p></div>
-      <div class="lab" style="padding:0">
-        <div class="card"><label class="pill" for="landing-message">Customer message</label><textarea id="landing-message" class="textarea">${demoMessages[1]}</textarea><div class="actions"><button id="landing-analyse" class="btn">Run demo pipeline →</button><a class="btn secondary" href="/test-lab">Open full Test Lab</a></div><div class="examples">${demoMessages.map((message, index) => `<button class="example" data-landing-message="${escapeHtml(message)}">Example ${index + 1}</button>`).join('')}</div></div>
-        <div class="card"><h3 style="margin-top:0">Result</h3><p class="muted">Classification, pricing, safety gate and suggested reply appear here.</p><pre id="landing-result" class="result">${initialLandingResult}</pre></div>
-      </div>
-    </section>
-    <section id="workflow" class="section"><div class="section-title"><h2>Customer message in. Admin handled.</h2><a class="btn secondary" href="#live-demo" data-demo-start>Try the live flow</a></div><div class="workflow">${['Lead arrives from WhatsApp, SMS, email or manual paste.','Traden qualifies it and extracts missing fields.','Price is calculated from your own rules — never invented.','Owner approves, then booking, invoice and review follow-up happen.'].map((item) => `<article class="card step"><p class="muted">${item}</p></article>`).join('')}</div></section>
-    <section class="panel footer-cta"><h2>Ready to see it work?</h2><p class="muted">Open the Lead Test Lab and run the full demo pipeline with trade-specific examples.</p><div class="actions" style="justify-content:center"><a class="btn" href="#live-demo" data-demo-start>Start free demo →</a><a class="btn secondary" href="/dashboard">View dashboard</a></div></section>
-  </main><script>
-async function runDemoFrom(messageId, resultId) {
-  const input = document.querySelector(messageId);
-  const result = document.querySelector(resultId);
-  if (!input || !result) return;
-  result.textContent = 'Running Traden pipeline…';
-  try {
-    const response = await fetch('/api/test-lab/analyse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bodyText: input.value }) });
-    const data = await response.json();
-    result.textContent = JSON.stringify(data, null, 2);
-  } catch (error) {
-    result.textContent = 'Demo failed: ' + (error instanceof Error ? error.message : String(error));
-  }
-}
-document.addEventListener('click', (event) => {
-  const start = event.target.closest('[data-demo-start]');
-  if (start && document.querySelector('#landing-message')) {
-    event.preventDefault();
-    document.querySelector('#live-demo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    runDemoFrom('#landing-message', '#landing-result');
-  }
-  const example = event.target.closest('[data-landing-message]');
-  if (example) {
-    document.querySelector('#landing-message').value = example.dataset.landingMessage;
-    runDemoFrom('#landing-message', '#landing-result');
-  }
-});
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelector('#landing-analyse')?.addEventListener('click', () => runDemoFrom('#landing-message', '#landing-result'));
-});
-</script>`);
-}
+function landingPage(){return shell('Traden',`<section class='hero'><div class='card'><span class='pill'>Working demo MVP</span><h1>Turn trade enquiries into booked jobs.</h1><p class='muted'>Onboarding, dashboard, test lab, CRM, action cards, calendar booking, job completion, invoices and review flow are interactive in demo mode.</p><div class='actions'><a class='btn' href='/onboarding'>Start onboarding</a><a class='btn secondary' href='/test-lab'>Open test lab</a></div><p class='muted'>Trades supported: ${trades.join(', ')}.</p></div><div class='card'><h3>Demo flow</h3><ol><li>Onboard business</li><li>Analyse lead in test lab</li><li>Approve action card</li><li>Book slot</li><li>Complete job</li><li>Invoice + review</li></ol></div></section>`)}
 
-function testLabPage() {
-  const initialTestLabResult = escapeHtml(JSON.stringify(analyseLead(demoMessages[1]), null, 2));
-  return layout(`<main class="shell"><section class="section-title" style="padding-top:34px"><div><span class="eyebrow"><span class="dot"></span> Lead Test Lab</span><h1 style="font-size:clamp(42px,6vw,70px)">Run the full lead pipeline.</h1><p class="lead">Paste a customer message, then see normalisation, classification, pricing, owner approval and the suggested reply.</p></div></section><section class="lab"><div class="card"><label class="pill" for="message">Customer message</label><textarea id="message" class="textarea">${demoMessages[1]}</textarea><div class="actions"><button id="analyse" class="btn">Analyse lead →</button><a class="btn secondary" href="/">Back to landing</a></div><div class="examples">${demoMessages.map((message, index) => `<button class="example" data-message="${escapeHtml(message)}">Example ${index + 1}</button>`).join('')}</div></div><div class="card"><h2 style="margin-top:0">Pipeline result</h2><p class="muted">The result below is deterministic demo mode, using saved trade rules and safety gates.</p><pre id="result" class="result">${initialTestLabResult}</pre></div></section></main><script>
-const examples = document.querySelectorAll('.example');
-const input = document.querySelector('#message');
-const result = document.querySelector('#result');
-examples.forEach((button) => button.addEventListener('click', () => { input.value = button.dataset.message; runTestLabDemo(); }));
-async function runTestLabDemo() {
-  result.textContent = 'Analysing…';
-  try {
-    const response = await fetch('/api/test-lab/analyse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bodyText: input.value }) });
-    result.textContent = JSON.stringify(await response.json(), null, 2);
-  } catch (error) {
-    result.textContent = 'Demo failed: ' + (error instanceof Error ? error.message : String(error));
-  }
-}
-document.querySelector('#analyse').addEventListener('click', runTestLabDemo);
-runTestLabDemo();
-</script>`, 'Traden Test Lab');
-}
+function onboardingPage(){return shell('Onboarding',`<div class='grid'><div class='card'><h2>Onboarding</h2><label>Business name</label><input id='biz-name' class='input'/><label>Trade</label><select id='biz-trade'>${trades.map(t=>`<option>${t}</option>`).join('')}</select><label>Automation</label><select id='biz-auto'><option>draft_only</option><option selected>assisted</option><option>autopilot</option></select><div class='actions'><button class='btn' id='save-onboard'>Complete onboarding</button><a class='btn secondary' href='/dashboard'>Continue</a></div><pre id='out'>Complete onboarding to save business profile.</pre></div><div class='card'><h3>Seeded services</h3>${services.map(s=>`<p class='muted'>${s.name} (${s.trade})</p>`).join('')}</div></div>`,`const s=traden.ensure();bizName=document.getElementById('biz-name');bizTrade=document.getElementById('biz-trade');bizAuto=document.getElementById('biz-auto');bizName.value=s.business.name;bizTrade.value=s.business.trade;bizAuto.value=s.business.automation;document.getElementById('save-onboard').onclick=()=>{const st=traden.ensure();st.business={name:bizName.value,trade:bizTrade.value,automation:bizAuto.value,onboarded:true};traden.saveState(st);document.getElementById('out').textContent=JSON.stringify(st.business,null,2);};`)}
 
-function appPage(pathname) {
-  const title = pathname.split('/').filter(Boolean).join(' / ') || 'Dashboard';
-  const cards = ['New leads today', 'Quotes waiting', 'Action cards', 'Jobs booked', 'Payments outstanding', 'Reviews requested'];
-  return layout(`<main class="shell"><section class="section-title" style="padding-top:34px"><div><span class="eyebrow"><span class="dot"></span> Demo mode</span><h1 style="font-size:clamp(42px,6vw,72px);text-transform:capitalize">${title}</h1><p class="lead">A polished demo surface for Traden. Connect real integrations when credentials are ready.</p></div></section><section class="grid">${cards.map((card) => `<article class="card"><span class="pill">Demo</span><h3>${card}</h3><p class="muted">Mobile-friendly cards keep the tradesman in control with clear actions.</p><div class="actions"><button class="btn">Approve</button><button class="btn secondary">Edit first</button></div></article>`).join('')}</section></main>`, `Traden ${title}`);
-}
+function dashboardPage(){return shell('Dashboard',`<div class='grid'><div class='card'><p class='muted'>New leads</p><h2 id='k1'>0</h2></div><div class='card'><p class='muted'>Quotes waiting</p><h2 id='k2'>0</h2></div><div class='card'><p class='muted'>Jobs booked</p><h2 id='k3'>0</h2></div><div class='card'><p class='muted'>Payments pending</p><h2 id='k4'>0</h2></div></div><div class='card'><div class='actions'><a class='btn' href='/test-lab'>Analyse lead</a><a class='btn secondary' href='/actions'>Action cards</a><a class='btn secondary' href='/calendar'>Book slots</a></div></div>`,`const s=traden.ensure();k1.textContent=s.leads.filter(l=>['new','qualifying','quoted'].includes(l.status)).length;k2.textContent=s.leads.filter(l=>l.status==='quoted').length;k3.textContent=s.jobs.filter(j=>j.status==='scheduled').length;k4.textContent=s.invoices.filter(i=>i.status!=='paid').length;`)}
 
-function escapeHtml(value) {
-  return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-}
+function testLabPage(){return shell('Test Lab',`<div class='grid'><div class='card'><label>Customer message</label><textarea id='msg' class='textarea'>${demoMessages[1]}</textarea><div class='actions'><button class='btn' id='analyse'>Run analysis</button><a class='btn secondary' href='/leads'>Open CRM</a></div><div class='actions'>${demoMessages.map((m,i)=>`<button class='btn secondary ex' data-msg="${m.replaceAll('"','&quot;')}">Example ${i+1}</button>`).join('')}</div></div><div class='card'><h3>Pipeline output</h3><pre id='result'>Ready.</pre></div></div>`,`traden.ensure();async function run(){const res=await fetch('/api/test-lab/analyse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bodyText:msg.value})});const data=await res.json();result.textContent=JSON.stringify(data,null,2);const s=traden.ensure();const lead={id:Date.now()+'',customer:'Demo Customer',trade:data.analysis.trade,service:data.analysis.serviceMatch,status:data.analysis.ownerApprovalRequired?'qualifying':'quoted',price:data.pricing.price||data.pricing.fromPrice||0,suggestedReply:data.suggestedReply};s.leads.unshift(lead);if(data.analysis.ownerApprovalRequired)s.actions.unshift({id:'a'+Date.now(),type:'send_reply',summary:lead.service+' needs approval',message:data.suggestedReply,leadId:lead.id});traden.saveState(s);} analyse.onclick=run;document.querySelectorAll('.ex').forEach(b=>b.onclick=()=>{msg.value=b.dataset.msg;run();});`)}
 
-async function readBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  return Buffer.concat(chunks).toString('utf8');
-}
+function leadsPage(){return shell('CRM Leads',`<div class='card'><div id='list' class='list'></div><div class='actions'><a class='btn' href='/test-lab'>Add lead from Test Lab</a></div></div>`,`const s=traden.ensure();const order=['new','qualifying','quoted','booking_pending','booked','completed','paid'];if(!s.leads.length){list.innerHTML='<p class="muted">No leads yet.</p>'; } else {list.innerHTML=s.leads.map((l,i)=>'<div class="card"><span class="state">'+l.status+'</span><h3>'+l.service+'</h3><p class="muted">'+l.trade+' • £'+(l.price||'TBC')+'</p><div class="actions"><button class="btn secondary nxt" data-i="'+i+'">Advance status</button><button class="btn secondary act" data-i="'+i+'">Create action card</button></div></div>').join('');document.querySelectorAll('.nxt').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);const idx=order.indexOf(s.leads[i].status);s.leads[i].status=order[Math.min(idx+1,order.length-1)];traden.saveState(s);location.reload();});document.querySelectorAll('.act').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);s.actions.unshift({id:'a'+Date.now(),type:'follow_up',summary:'Follow up '+s.leads[i].service,message:s.leads[i].suggestedReply||''});traden.saveState(s);location.href='/actions';});}`)}
 
-http.createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', `http://localhost:${port}`);
+function actionsPage(){return shell('Action Cards',`<div class='card'><div id='alist' class='list'></div></div>`,`const s=traden.ensure();if(!s.actions.length){alist.innerHTML='<p class="muted">No pending actions.</p>';} else {alist.innerHTML=s.actions.map((a,i)=>'<div class="card"><span class="pill">'+a.type+'</span><h3>'+a.summary+'</h3><p class="muted">'+(a.message||'')+'</p><div class="actions"><button class="btn ok" data-i="'+i+'">Send reply</button><button class="btn secondary edit" data-i="'+i+'">Edit first</button><button class="btn secondary rej" data-i="'+i+'">Reject</button></div></div>').join('');document.querySelectorAll('.ok,.rej').forEach(b=>b.onclick=()=>{s.actions.splice(Number(b.dataset.i),1);traden.saveState(s);location.reload();});document.querySelectorAll('.edit').forEach(b=>b.onclick=()=>alert('Edit first flow (demo): open lead and modify message.'));}`)}
 
-  if (req.method === 'POST' && url.pathname === '/api/test-lab/analyse') {
-    const raw = await readBody(req);
-    const payload = raw ? JSON.parse(raw) : {};
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify(analyseLead(payload.bodyText), null, 2));
-    return;
-  }
+function calendarPage(){return shell('Calendar Booking',`<div class='card'><div id='slots' class='list'></div></div>`,`const s=traden.ensure();const lead=s.leads.find(l=>['quoted','booking_pending'].includes(l.status));const cand=['Friday 10:30','Friday 14:00','Monday 09:30'];if(!lead){slots.innerHTML='<p class="muted">No lead ready for booking.</p>'; } else {slots.innerHTML=cand.map((slot,i)=>'<div class="card"><h3>'+slot+'</h3><p class="muted">'+lead.service+' • score '+(92-i*8)+'</p><div class="actions"><button class="btn book" data-i="'+i+'">Book this slot</button><button class="btn secondary">Offer both slots</button></div></div>').join('');document.querySelectorAll('.book').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);s.jobs.unshift({id:'j'+Date.now(),service:lead.service,customer:lead.customer,slot:cand[i],status:'scheduled',paymentStatus:'unpaid',price:lead.price||85});lead.status='booked';traden.saveState(s);location.href='/jobs';});}`)}
 
-  res.setHeader('content-type', 'text/html; charset=utf-8');
-  if (url.pathname === '/') res.end(landingPage({ preRun: url.searchParams.get('demo') === '1' }));
-  else if (url.pathname === '/test-lab') res.end(testLabPage());
-  else res.end(appPage(url.pathname));
-}).listen(port, () => console.log(`Traden demo running on http://localhost:${port}`));
+function jobsPage(){return shell('Jobs',`<div class='card'><div id='jobs' class='list'></div></div>`,`const s=traden.ensure();if(!s.jobs.length){jobs.innerHTML='<p class="muted">No jobs booked yet.</p>'; } else {jobs.innerHTML=s.jobs.map((j,i)=>'<div class="card"><h3>'+j.service+' — '+j.customer+'</h3><p class="muted">'+j.slot+' • '+j.status+'</p><div class="actions"><button class="btn paid" data-i="'+i+'">Mark paid card</button><button class="btn secondary cash" data-i="'+i+'">Mark paid cash</button><button class="btn secondary inv" data-i="'+i+'">Needs invoice</button><button class="btn secondary unh" data-i="'+i+'">Customer unhappy</button></div></div>').join('');document.querySelectorAll('.paid,.cash').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);s.jobs[i].status='completed';s.jobs[i].paymentStatus=b.classList.contains('cash')?'paid_cash':'paid_card';s.invoices.unshift({id:'inv'+Date.now(),customer:s.jobs[i].customer,total:s.jobs[i].price||85,status:'paid'});s.reviews.unshift({id:'r'+Date.now(),customer:s.jobs[i].customer,status:'queued'});traden.saveState(s);location.reload();});document.querySelectorAll('.inv').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);s.jobs[i].status='completed';s.jobs[i].paymentStatus='invoice_needed';s.invoices.unshift({id:'inv'+Date.now(),customer:s.jobs[i].customer,total:s.jobs[i].price||85,status:'sent'});traden.saveState(s);location.href='/invoices';});document.querySelectorAll('.unh').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);s.jobs[i].status='issue';s.actions.unshift({id:'a'+Date.now(),type:'resolve_complaint',summary:'Customer unhappy: '+s.jobs[i].customer,message:'Owner follow-up required'});traden.saveState(s);location.href='/actions';});}`)}
+
+function invoicesPage(){return shell('Invoices & Reviews',`<div class='card'><div id='inv' class='list'></div></div>`,`const s=traden.ensure();if(!s.invoices.length){inv.innerHTML='<p class="muted">No invoices yet.</p>'; } else {inv.innerHTML=s.invoices.map((x,i)=>'<div class="card"><h3>Invoice '+(i+1)+' — '+x.customer+'</h3><p class="muted">£'+x.total+' • '+x.status+'</p><div class="actions"><button class="btn mp" data-i="'+i+'">Mark paid card</button><button class="btn secondary rv" data-i="'+i+'">Send review request</button></div><pre id="rv'+i+'">No review sent.</pre></div>').join('');document.querySelectorAll('.mp').forEach(b=>b.onclick=()=>{s.invoices[Number(b.dataset.i)].status='paid';traden.saveState(s);location.reload();});document.querySelectorAll('.rv').forEach(b=>b.onclick=()=>{document.getElementById('rv'+b.dataset.i).textContent='Thanks again for booking with us. Please leave a quick review: https://g.page/r/demo';s.reviews.unshift({id:'r'+Date.now(),customer:s.invoices[Number(b.dataset.i)].customer,status:'sent'});traden.saveState(s);});}`)}
+
+function settingsPage(){return shell('Settings',`<div class='grid'><div class='card'><h3>Business</h3><p class='muted'>Trade profile and service area.</p></div><div class='card'><h3>Services</h3><p class='muted'>Trade-agnostic pricing rules.</p></div><div class='card'><h3>Integrations</h3><p class='muted'>WhatsApp/Twilio/Gmail/Calendar/Stripe are integration-ready stubs in demo mode.</p></div></div>`)}
+
+function page(path){if(path==='/')return landingPage();if(path==='/onboarding')return onboardingPage();if(path==='/dashboard')return dashboardPage();if(path==='/test-lab')return testLabPage();if(path==='/leads')return leadsPage();if(path==='/actions')return actionsPage();if(path==='/calendar')return calendarPage();if(path==='/jobs')return jobsPage();if(path==='/invoices')return invoicesPage();if(path.startsWith('/settings'))return settingsPage();return shell('Traden',`<div class='card'><p class='muted'>Demo page. Use top navigation.</p></div>`)}
+
+async function readBody(req){const chunks=[];for await(const chunk of req)chunks.push(chunk);return Buffer.concat(chunks).toString('utf8')}
+
+http.createServer(async (req,res)=>{
+  const url=new URL(req.url ?? '/',`http://localhost:${port}`);
+  if(url.pathname==='/app.js'){res.setHeader('content-type','application/javascript');res.end(appJs);return;}
+  if(req.method==='POST' && url.pathname==='/api/test-lab/analyse'){const raw=await readBody(req);const payload=raw?JSON.parse(raw):{};res.setHeader('content-type','application/json');res.end(JSON.stringify(analyseLead(payload.bodyText),null,2));return;}
+  res.setHeader('content-type','text/html; charset=utf-8');
+  res.end(page(url.pathname));
+}).listen(port,()=>console.log(`Traden demo running on http://localhost:${port}`));
