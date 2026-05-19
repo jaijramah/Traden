@@ -1,0 +1,1 @@
+export function resolveContact(message: { senderHandle: string }, contacts: Array<{phone?: string|null; email?: string|null; label?: string}> = []) { return contacts.find(c => c.phone === message.senderHandle || c.email === message.senderHandle) ?? null; }

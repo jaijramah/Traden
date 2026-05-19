@@ -1,0 +1,16 @@
+import { NextResponse } from 'next/server';
+import { normaliseManualInput } from '@/lib/messages/normalise';
+import { analyseLead } from '@/lib/ai/analyseLead';
+import { priceLead } from '@/lib/pricing/priceLead';
+import { evaluateApprovalPolicy } from '@/lib/automation/approvalPolicy';
+import { generateReply } from '@/lib/replies/generateReply';
+const services = [
+ {id:'boiler-service',name:'Boiler service',pricingStrategy:'fixed_price',requiredFields:['postcode','boiler make/model','preferred date'],riskFlags:['regulated_trade','gas_safety'],autoQuoteAllowed:false},
+ {id:'eicr',name:'EICR certificate',pricingStrategy:'fixed_price',requiredFields:['postcode','property type','preferred date'],riskFlags:['regulated_trade','electrical_safety'],autoQuoteAllowed:false},
+ {id:'leak-inspection',name:'Leak inspection',pricingStrategy:'from_price',requiredFields:['postcode','photos'],riskFlags:['working_at_height'],autoQuoteAllowed:false},
+ {id:'deep-clean',name:'Deep clean',pricingStrategy:'package_price',requiredFields:['postcode','vehicle size'],riskFlags:[],autoQuoteAllowed:true},
+ {id:'end-of-tenancy',name:'End-of-tenancy clean',pricingStrategy:'package_price',requiredFields:['postcode','rooms'],riskFlags:[],autoQuoteAllowed:true},
+ {id:'rear-tints',name:'Rear window tints',pricingStrategy:'fixed_price',requiredFields:['postcode','vehicle make/model'],riskFlags:[],autoQuoteAllowed:true}
+];
+const rules:any = { 'boiler-service':{pricingStrategy:'fixed_price',basePrice:85,currency:'GBP',modifiers:[]}, eicr:{pricingStrategy:'fixed_price',basePrice:120,currency:'GBP',modifiers:[]}, 'leak-inspection':{pricingStrategy:'from_price',fromPrice:120,currency:'GBP',modifiers:[]}, 'deep-clean':{pricingStrategy:'package_price',basePrice:140,currency:'GBP',modifiers:[{field:'vehicle_size',equals:'large',add:30}]}, 'end-of-tenancy':{pricingStrategy:'package_price',basePrice:80,currency:'GBP',modifiers:[{field:'rooms',multiplyBy:40}]}, 'rear-tints':{pricingStrategy:'fixed_price',basePrice:150,currency:'GBP',modifiers:[]} };
+export async function POST(req: Request){ const body = await req.json(); const message = normaliseManualInput({ bodyText: body.bodyText, channel: body.channel ?? 'manual', businessId:'demo' }); const analysis = await analyseLead(message,{services}); const service = services.find(s=>s.id===analysis.serviceMatch.serviceId) ?? services[0]; const pricing = priceLead({ business:{defaultCurrency:'GBP'}, service, priceRules:[rules[service.id]], jobVariables:{...analysis.extractedFields.jobVariables, postcode: analysis.extractedFields.postcode ?? analysis.extractedFields.locationText}, urgency:analysis.extractedFields.urgency, distanceMiles:12 }); const policy = evaluateApprovalPolicy({ automationMode:'assisted', analysis, pricing, service }); const reply = generateReply({ type: pricing.canQuote && pricing.price ? 'quote' : pricing.fromPrice ? 'from_quote' : 'ask_missing_fields', serviceName:service.name, pricing, missingFields:[...analysis.missingFields,...pricing.missingFields] }); return NextResponse.json({ universalMessage:message, analysis, pricing, approvalPolicy:policy, suggestedReply:reply, summary:`${analysis.classification} • ${service.name} • ${policy.createApproval?'owner approval':'can auto-send'}` }); }
