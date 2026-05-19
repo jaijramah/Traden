@@ -1,0 +1,1 @@
+export async function sendSms(input:{to:string;bodyText:string}) { if (!process.env.TWILIO_ACCOUNT_SID) return { id:`mock-sms-${Date.now()}`, mock:true, input }; return { id:`sms-${Date.now()}`, mock:false }; }
